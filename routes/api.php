@@ -16,6 +16,7 @@ use App\Http\Controllers\BigBagController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InconsistenciasController;
+use App\Http\Controllers\DashboardIncController;
 
 /*
 |--------------------------------------------------------------------------
@@ -292,8 +293,25 @@ Route::prefix('inconsistencias')->group(function () {
      Route::get('/listas-consumo', [InconsistenciasController::class, 'InconsistenciaConsumo']);
      Route::post('/consumir', [InconsistenciasController::class, 'consumirInconsistencia']);
      
+});
 
+//dashboard inconsistencias
 
+Route::prefix('dashboardInc')->group(function () {
+    // Métricas principales
+    Route::get('/metricas/productividad', [DashboardIncController::class, 'getProductividad']);
+    Route::get('/metricas/costos', [DashboardIncController::class, 'getCostos']);
+    Route::get('/metricas/consumo', [DashboardIncController::class, 'getConsumo']);
+    Route::get('/metricas/gestion-humana', [DashboardIncController::class, 'getGestionHumana']);
+    
+    // Datos para filtros
+    Route::get('/filtros/departamentos', [DashboardIncController::class, 'getDepartamentos']);
+    Route::get('/filtros/clientes', [DashboardIncController::class, 'getClientes']);
+    Route::get('/filtros/tipos', [DashboardIncController::class, 'getTiposInconsistencia']);
+    Route::get('/filtros/usuarios', [DashboardIncController::class, 'getUsuarios']);
+    
+    // Dashboard general
+    Route::get('/dashboard', [DashboardIncController::class, 'getDashboardData']);
 });
 
 

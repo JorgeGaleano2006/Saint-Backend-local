@@ -728,45 +728,49 @@ class InconsistenciasController extends Controller
     /**
      * 🔹 Aprobar o denegar una inconsistencia
      */
-    public function accionInconsistencia(Request $request)
-    {
-        $validated = $request->validate([
-            'id_inconsistencia' => 'required|integer',
-            'id_Sdp' => 'required|integer',
-            'accion' => 'required|string|in:aprobar,denegar',
-            'motivo' => 'nullable|string'
-        ]);
+   public function accionInconsistencia(Request $request)
+{
+    $validated = $request->validate([
+        'id_inconsistencia' => 'required|integer',
+        'id_Sdp' => 'required|integer',
+        'accion' => 'required|string|in:aprobar,denegar',
+        'motivo' => 'nullable|string',
+        'accion_tomar' => 'nullable|string' // 👈 Nuevo campo opcional
+    ]);
 
-        $id = $validated['id_inconsistencia'];
-        $id_usuario = $validated['id_Sdp'];
-        $accion = $validated['accion'];
-        $motivo = $validated['motivo'] ?? null;
+    $id = $validated['id_inconsistencia'];
+    $id_usuario = $validated['id_Sdp'];
+    $accion = $validated['accion'];
+    $motivo = $validated['motivo'] ?? null;
+    $accion_tomar = $validated['accion_tomar'] ?? null; // 👈 Capturar acción a tomar
 
-        // Buscar inconsistencia
-        $inconsistencia = InconsistenciaModelo::where('id_inconsistencia', $id)->first();
+    // Buscar inconsistencia
+    $inconsistencia = InconsistenciaModelo::where('id_inconsistencia', $id)->first();
 
-        if (!$inconsistencia) {
-            return response()->json(['success' => false, 'message' => 'Inconsistencia no encontrada.'], 404);
-        }
-
-        // Decidir la acción
-        $resultado = false;
-        if ($accion === 'aprobar') {
-            $resultado = $inconsistencia->aprobarEtapaActual($id_usuario);
-        } elseif ($accion === 'denegar') {
-            $resultado = $inconsistencia->denegar($id_usuario, $motivo);
-        }
-
-        if ($resultado) {
-            return response()->json([
-                'success' => true,
-                'message' => 'Acción ejecutada correctamente.',
-                'nueva_etapa' => $inconsistencia->fresh()->etapa
-            ]);
-        } else {
-            return response()->json(['success' => false, 'message' => 'No se pudo ejecutar la acción.']);
-        }
+    if (!$inconsistencia) {
+        return response()->json(['success' => false, 'message' => 'Inconsistencia no encontrada.'], 404);
     }
+
+    // Decidir la acción
+    $resultado = false;
+    if ($accion === 'aprobar') {
+        // 👇 Pasar la acción a tomar al método aprobar
+        $resultado = $inconsistencia->aprobarEtapaActual($id_usuario, $accion_tomar);
+    } elseif ($accion === 'denegar') {
+        $resultado = $inconsistencia->denegar($id_usuario, $motivo);
+    }
+
+    if ($resultado) {
+        return response()->json([
+            'success' => true,
+            'message' => 'Acción ejecutada correctamente.',
+            'nueva_etapa' => $inconsistencia->fresh()->etapa
+        ]);
+    } else {
+        return response()->json(['success' => false, 'message' => 'No se pudo ejecutar la acción.']);
+    }
+}
+
 
 
 

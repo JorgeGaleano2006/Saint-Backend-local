@@ -335,59 +335,63 @@ class InconsistenciaModelo extends Model
     /**
      * Aprueba la etapa actual y avanza a la siguiente
      */
-    public function aprobarEtapaActual($id_usuario)
-    {
-        $etapa_actual = $this->etapa ?? 'lider';
-        $tipo_inconsistencia = $this->tipo_inconsistencia;
+    public function aprobarEtapaActual($id_usuario, $accion_tomar)
+{
+    $etapa_actual = $this->etapa ?? 'lider';
+    $tipo_inconsistencia = $this->tipo_inconsistencia;
 
-        $siguiente_etapa = self::obtenerSiguienteEtapa($tipo_inconsistencia, $etapa_actual);
+    $siguiente_etapa = self::obtenerSiguienteEtapa($tipo_inconsistencia, $etapa_actual);
 
-        // Determinar qué campos actualizar según la etapa
-        $datos_actualizacion = [
-            'etapa' => $siguiente_etapa,
-        ];
+    // Determinar qué campos actualizar según la etapa
+    $datos_actualizacion = [
+        'etapa' => $siguiente_etapa,
+    ];
 
-        // Guardar quién aprobó según la etapa
-        switch ($etapa_actual) {
-            case 'lider':
-                $datos_actualizacion['lider_que_aprobo'] = $id_usuario;
-                $datos_actualizacion['fecha_lider'] = Carbon::now('America/Bogota');
-                break;
-            case 'calidad':
-                $datos_actualizacion['calidad_que_aprobo'] = $id_usuario;
-                $datos_actualizacion['fecha_calidad'] = Carbon::now('America/Bogota');
-                break;
-            case 'logistica':
-                $datos_actualizacion['logistica_que_aprobo'] = $id_usuario;
-                $datos_actualizacion['fecha_logistica'] = Carbon::now('America/Bogota');
-                break;
-            case 'trazo':
-                $datos_actualizacion['trazo_que_aprobo'] = $id_usuario;
-                $datos_actualizacion['fecha_trazo'] = Carbon::now('America/Bogota');
-                break;
-            case 'patronaje':
-                $datos_actualizacion['patronaje_que_aprobo'] = $id_usuario;
-                $datos_actualizacion['fecha_patronaje'] = Carbon::now('America/Bogota');
-                break;
-            case 'contabilidad':
-                $datos_actualizacion['contabilidad_que_aprobo'] = $id_usuario;
-                $datos_actualizacion['fecha_contabilidad'] = Carbon::now('America/Bogota');
-                break;
-            case 'cartera':
-                $datos_actualizacion['cartera_que_aprobo'] = $id_usuario;
-                $datos_actualizacion['fecha_cartera'] = Carbon::now('America/Bogota');
-                break;
-        }
-
-        // Si llega a "terminada", cambiar el estado
-        if ($siguiente_etapa === 'terminada') {
-            $datos_actualizacion['estado_inconsistencia'] = 'Aprobada';
-        }
-
-        $datos_actualizacion['observacion'] = null; // Limpiar observaciones al aprobar
-
-        return $this->update($datos_actualizacion);
+    // Guardar quién aprobó según la etapa
+    switch ($etapa_actual) {
+        case 'lider':
+            $datos_actualizacion['lider_que_aprobo'] = $id_usuario;
+            $datos_actualizacion['fecha_lider'] = Carbon::now('America/Bogota');
+            break;
+        case 'calidad':
+            $datos_actualizacion['calidad_que_aprobo'] = $id_usuario;
+            $datos_actualizacion['fecha_calidad'] = Carbon::now('America/Bogota');
+            // 👇 Solo guardar acción_inconsistencia si viene desde Calidad
+            if ($accion_tomar !== null) {
+                $datos_actualizacion['accion_inconsistencia'] = $accion_tomar;
+            }
+            break;
+        case 'logistica':
+            $datos_actualizacion['logistica_que_aprobo'] = $id_usuario;
+            $datos_actualizacion['fecha_logistica'] = Carbon::now('America/Bogota');
+            break;
+        case 'trazo':
+            $datos_actualizacion['trazo_que_aprobo'] = $id_usuario;
+            $datos_actualizacion['fecha_trazo'] = Carbon::now('America/Bogota');
+            break;
+        case 'patronaje':
+            $datos_actualizacion['patronaje_que_aprobo'] = $id_usuario;
+            $datos_actualizacion['fecha_patronaje'] = Carbon::now('America/Bogota');
+            break;
+        case 'contabilidad':
+            $datos_actualizacion['contabilidad_que_aprobo'] = $id_usuario;
+            $datos_actualizacion['fecha_contabilidad'] = Carbon::now('America/Bogota');
+            break;
+        case 'cartera':
+            $datos_actualizacion['cartera_que_aprobo'] = $id_usuario;
+            $datos_actualizacion['fecha_cartera'] = Carbon::now('America/Bogota');
+            break;
     }
+
+    // Si llega a "terminada", cambiar el estado
+    if ($siguiente_etapa === 'terminada') {
+        $datos_actualizacion['estado_inconsistencia'] = 'Aprobada';
+    }
+
+    $datos_actualizacion['observacion'] = null; // Limpiar observaciones al aprobar
+
+    return $this->update($datos_actualizacion);
+}
 
 
     /**
@@ -421,27 +425,45 @@ class InconsistenciaModelo extends Model
     }
 
 
-    public static function obtenerTiemposProceso($id)
+ public static function obtenerTiemposProceso($id)
 {
-    return self::select(
-        'id',
-        'id_inconsistencia',
-        'fecha_inconsistencia',
-        'fecha_lider',
-        'fecha_trazo',           // ⚠️ Asegúrate de tener este campo
-        'fecha_patronaje',       // ⚠️ Asegúrate de tener este campo
-        'fecha_calidad',
-        'fecha_logistica',
-        'fecha_contabilidad',    // ⚠️ Si lo usas
-        'fecha_cartera',         // ⚠️ Si lo usas (o fecha_aprobacion_cartera)
-        'fecha_de_consumo',
-        'etapa',
-        'estado_inconsistencia',
-        'persona_que_anulo',
-        'tipo_inconsistencia',
-        'fecha_aprobacion_cartera'
-    )
-    ->where('id_inconsistencia', $id)
+    return self::selectRaw("
+        i.id,
+        i.id_inconsistencia,
+        i.fecha_inconsistencia,
+        i.fecha_lider,
+        i.fecha_trazo,
+        i.fecha_patronaje,
+        i.fecha_calidad,
+        i.fecha_logistica,
+        i.fecha_contabilidad,
+        i.fecha_cartera,
+        i.fecha_de_consumo,
+        i.etapa,
+        i.estado_inconsistencia,
+        i.persona_que_anulo,
+        i.tipo_inconsistencia,
+        i.fecha_aprobacion_cartera,
+
+        CONCAT(ul.nombres, ' ', ul.apellidos)  AS nombre_lider,
+        CONCAT(ut.nombres, ' ', ut.apellidos)  AS nombre_trazo,
+        CONCAT(up.nombres, ' ', up.apellidos)  AS nombre_patronaje,
+        CONCAT(uc.nombres, ' ', uc.apellidos)  AS nombre_calidad,
+        CONCAT(ulg.nombres, ' ', ulg.apellidos) AS nombre_logistica,
+        CONCAT(uco.nombres, ' ', uco.apellidos) AS nombre_contabilidad,
+        CONCAT(uca.nombres, ' ', uca.apellidos) AS nombre_cartera,
+        CONCAT(ucon.nombres, ' ', ucon.apellidos) AS nombre_consumo
+    ")
+    ->from('inconsistencias AS i')
+    ->leftJoin('usuarios AS ul',  'i.lider_que_aprobo',        '=', 'ul.id_usuario')
+    ->leftJoin('usuarios AS ut',  'i.trazo_que_aprobo',        '=', 'ut.id_usuario')
+    ->leftJoin('usuarios AS up',  'i.patronaje_que_aprobo',    '=', 'up.id_usuario')
+    ->leftJoin('usuarios AS uc',  'i.calidad_que_aprobo',      '=', 'uc.id_usuario')
+    ->leftJoin('usuarios AS ulg', 'i.logistica_que_aprobo',    '=', 'ulg.id_usuario')
+    ->leftJoin('usuarios AS uco', 'i.contabilidad_que_aprobo', '=', 'uco.id_usuario')
+    ->leftJoin('usuarios AS uca', 'i.cartera_que_aprobo',      '=', 'uca.id_usuario')
+    ->leftJoin('usuarios AS ucon', 'i.usuario_que_consumio',   '=', 'ucon.id_usuario')
+    ->where('i.id_inconsistencia', $id)
     ->first();
 }
 
