@@ -5,8 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 
+
 class DashboardIncModel extends Model
 {
+    
+    protected $connection = 'solicitud_de_permisos_local';
     protected $table = 'inconsistencias';
     protected $primaryKey = 'id';
     public $timestamps = false;
@@ -28,32 +31,32 @@ class DashboardIncModel extends Model
     // Relaciones
     public function usuarioSolicitante()
     {
-        return $this->belongsTo(Usuario::class, 'solicitante', 'id_usuario');
+        return $this->belongsTo(InconsistenciaUsuario::class, 'solicitante', 'id_usuario');
     }
 
     public function departamentoRelacion()
     {
-        return $this->belongsTo(Departamento::class, 'departamento', 'id_departamento');
+        return $this->belongsTo( InconsistenciaDepartamento ::class, 'departamento', 'id_departamento');
     }
 
     public function liderAprobo()
     {
-        return $this->belongsTo(Usuario::class, 'lider_que_aprobo', 'id_usuario');
+        return $this->belongsTo(InconsistenciaUsuario::class, 'lider_que_aprobo', 'id_usuario');
     }
 
     public function calidadAprobo()
     {
-        return $this->belongsTo(Usuario::class, 'calidad_que_aprobo', 'id_usuario');
+        return $this->belongsTo(InconsistenciaUsuario::class, 'calidad_que_aprobo', 'id_usuario');
     }
 
     public function logisticaAprobo()
     {
-        return $this->belongsTo(Usuario::class, 'logistica_que_aprobo', 'id_usuario');
+        return $this->belongsTo(InconsistenciaUsuario::class, 'logistica_que_aprobo', 'id_usuario');
     }
 
     public function usuarioConsumio()
     {
-        return $this->belongsTo(Usuario::class, 'usuario_que_consumio', 'id_usuario');
+        return $this->belongsTo(InconsistenciaUsuario::class, 'usuario_que_consumio', 'id_usuario');
     }
 
     // ==================== MÉTRICAS DE PRODUCTIVIDAD ====================
@@ -352,7 +355,7 @@ class DashboardIncModel extends Model
     
     public static function getDepartamentosUnicos()
     {
-        return Departamento::select('id_departamento', 'nombre_departamento')
+        return  InconsistenciaDepartamento ::select('id_departamento', 'nombre_departamento')
             ->orderBy('nombre_departamento')
             ->get();
     }
@@ -379,7 +382,7 @@ class DashboardIncModel extends Model
 
     public static function getUsuariosActivos()
     {
-        return Usuario::select('id_usuario', 'nombres', 'apellidos')
+        return InconsistenciaUsuario::select('id_usuario', 'nombres', 'apellidos')
             ->where('estado', 'activo')
             ->orderBy('nombres')
             ->get();

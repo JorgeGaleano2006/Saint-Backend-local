@@ -592,71 +592,156 @@ class InconsistenciasController extends Controller
     }
 
 
-    public function VerInconsistencia($idUsuario)
+      public function VerInconsistencia($idUsuario)
     {
-        if (!is_numeric($idUsuario)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'ID de usuario inválido'
-            ], 400);
-        }
+        try {
+            // Obtener inconsistencias del modelo
+            $inconsistencias = InconsistenciaModelo::obtenerTrazabilidadPorUsuario($idUsuario);
 
-        $inconsistencias = InconsistenciaModelo::obtenerInconsistenciaUsuario($idUsuario);
-
-        if ($inconsistencias->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No se encontraron inconsistencias'
-            ], 404);
-        }
-
-        // Transformar las evidencias a URLs completas
-        $inconsistencias = $inconsistencias->map(function ($inconsistencia) {
-            if ($inconsistencia->evidencias) {
-                $evidencias = json_decode($inconsistencia->evidencias, true);
-
-                if (is_array($evidencias)) {
-                    $inconsistencia->evidencias_urls = array_map(function ($ruta) {
-                        // Como están en public, usamos url() directamente
-                        return url($ruta);
-                    }, $evidencias);
-                } else {
-                    $inconsistencia->evidencias_urls = [];
-                }
-            } else {
-                $inconsistencia->evidencias_urls = [];
+            if ($inconsistencias->isEmpty()) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'No se encontraron inconsistencias para este usuario.',
+                    'data' => []
+                ]);
             }
 
-            return $inconsistencia;
-        });
+            // Procesar cada inconsistencia con lógica de negocio
+            $inconsistenciasProcesadas = $inconsistencias->map(function ($inconsistencia) {
+                // Procesar evidencias (convertir de JSON string a array si existe)
+                if ($inconsistencia->evidencias) {
+                    $inconsistencia->evidencias = json_decode($inconsistencia->evidencias, true);
+                }
+                
+                // Procesar detalles de consumo (convertir de JSON string a array si existe)
+                if ($inconsistencia->detalles_consumo) {
+                    $inconsistencia->detalles_consumo = json_decode($inconsistencia->detalles_consumo, true);
+                }
+                
+                // Construir el historial de aprobaciones
+                $inconsistencia->historial_aprobaciones = $this->construirHistorialAprobaciones($inconsistencia);
+                
+                // Determinar si puede ser anulada (solo si está abierta y no ha sido terminada)
+                $inconsistencia->puede_anular = in_array($inconsistencia->estado_inconsistencia, ['abierta', null]) 
+                    && $inconsistencia->etapa !== 'terminada';
+                
+                return $inconsistencia;
+            });
 
-        return response()->json([
-            'success' => true,
-            'data' => $inconsistencias
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Inconsistencias obtenidas correctamente.',
+                'data' => $inconsistenciasProcesadas
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener las inconsistencias.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 
     /**
-     * 🔹 Anular una inconsistencia
+     * Construye el historial de aprobaciones/rechazos de una inconsistencia
+     * 
+     * @param object $inconsistencia
+     * @return array
+     */
+    private function construirHistorialAprobaciones($inconsistencia)
+    {
+        $historial = [];
+        
+        // Orden cronológico de etapas
+        $etapas = [
+            'lider' => [
+                'nombre' => 'Líder',
+                'usuario' => $inconsistencia->nombre_lider_aprobo,
+                'fecha' => $inconsistencia->fecha_lider
+            ],
+            'contabilidad' => [
+                'nombre' => 'Contabilidad',
+                'usuario' => $inconsistencia->nombre_contabilidad_aprobo,
+                'fecha' => $inconsistencia->fecha_contabilidad
+            ],
+            'patronaje' => [
+                'nombre' => 'Patronaje',
+                'usuario' => $inconsistencia->nombre_patronaje_aprobo,
+                'fecha' => $inconsistencia->fecha_patronaje
+            ],
+            'trazo' => [
+                'nombre' => 'Trazo',
+                'usuario' => $inconsistencia->nombre_trazo_aprobo,
+                'fecha' => $inconsistencia->fecha_trazo
+            ],
+            'calidad' => [
+                'nombre' => 'Calidad',
+                'usuario' => $inconsistencia->nombre_calidad_aprobo,
+                'fecha' => $inconsistencia->fecha_calidad
+            ],
+            'logistica' => [
+                'nombre' => 'Logística',
+                'usuario' => $inconsistencia->nombre_logistica_aprobo,
+                'fecha' => $inconsistencia->fecha_logistica,
+                'observacion' => $inconsistencia->observacion_logistica
+            ],
+            'cartera' => [
+                'nombre' => 'Cartera',
+                'usuario' => $inconsistencia->nombre_cartera_aprobo,
+                'fecha' => $inconsistencia->fecha_aprobacion_cartera
+            ],
+            'espera' => [
+                'nombre' => 'En Espera',
+                'usuario' => $inconsistencia->nombre_persona_espera,
+                'fecha' => $inconsistencia->fecha_espera
+            ]
+        ];
+        
+        foreach ($etapas as $clave => $etapa) {
+            if ($etapa['fecha']) {
+                $historial[] = [
+                    'etapa' => $etapa['nombre'],
+                    'usuario' => $etapa['usuario'] ?? 'No especificado',
+                    'fecha' => $etapa['fecha'],
+                    'observacion' => $etapa['observacion'] ?? null
+                ];
+            }
+        }
+        
+        // Agregar información de anulación si existe
+        if ($inconsistencia->estado_inconsistencia === 'Anulada' && $inconsistencia->razon_anulacion) {
+            $historial[] = [
+                'etapa' => 'Anulada',
+                'usuario' => $inconsistencia->nombre_persona_que_anulo ?? 'No especificado',
+                'fecha' => $inconsistencia->fecha_anulacion,
+                'observacion' => $inconsistencia->razon_anulacion
+            ];
+        }
+        
+        // Agregar información de consumo si existe
+        if ($inconsistencia->estado_consumo === 'CONSUMIDO') {
+            $historial[] = [
+                'etapa' => 'Consumido',
+                'usuario' => $inconsistencia->nombre_usuario_consumio ?? 'No especificado',
+                'fecha' => $inconsistencia->fecha_de_consumo,
+                'observacion' => 'Estado de consumo completado'
+            ];
+        }
+        
+        return $historial;
+    }
+
+    /**
+     * Anula una inconsistencia (método ya existente)
      */
     public function anularInconsistencia(Request $request)
     {
-
         $request->validate([
             'id_inco' => 'required|integer',
             'razon_anulacion' => 'required|string',
             'id_usuario' => 'required|integer',
         ]);
-
-        // // Verifica que la inconsistencia exista
-        // $inconsistencia = InconsistenciaModelo::find($request->id_inco);
-
-        // if (!$inconsistencia) {
-        //     return response()->json([
-        //         'success' => false,
-        //         'message' => 'Inconsistencia no encontrada.'
-        //     ], 404);
-        // }
 
         // Lógica de negocio: delegar actualización al modelo
         $actualizada = InconsistenciaModelo::anular(
@@ -677,6 +762,13 @@ class InconsistenciasController extends Controller
             'message' => 'No fue posible anular la inconsistencia.'
         ], 500);
     }
+
+
+
+    /**
+     * 🔹 Anular una inconsistencia
+     */
+    
 
 
 
@@ -728,50 +820,202 @@ class InconsistenciasController extends Controller
     /**
      * 🔹 Aprobar o denegar una inconsistencia
      */
-   public function accionInconsistencia(Request $request)
-{
-    $validated = $request->validate([
-        'id_inconsistencia' => 'required|integer',
-        'id_Sdp' => 'required|integer',
-        'accion' => 'required|string|in:aprobar,denegar',
-        'motivo' => 'nullable|string',
-        'accion_tomar' => 'nullable|string' // 👈 Nuevo campo opcional
-    ]);
+ private const FLUJOS = [
+        'documental trazo' => ['lider', 'trazo', 'calidad', 'logistica', 'terminada'],
+        'error_patronaje' => ['lider', 'patronaje', 'calidad', 'logistica', 'terminada'],
+        'documental calidad' => ['lider', 'calidad', 'terminada'],
+        'documental_contabilidad' => ['lider', 'contabilidad', 'cartera', 'terminada'],
+        'default' => ['lider', 'calidad', 'logistica', 'terminada']
+    ];
 
-    $id = $validated['id_inconsistencia'];
-    $id_usuario = $validated['id_Sdp'];
-    $accion = $validated['accion'];
-    $motivo = $validated['motivo'] ?? null;
-    $accion_tomar = $validated['accion_tomar'] ?? null; // 👈 Capturar acción a tomar
-
-    // Buscar inconsistencia
-    $inconsistencia = InconsistenciaModelo::where('id_inconsistencia', $id)->first();
-
-    if (!$inconsistencia) {
-        return response()->json(['success' => false, 'message' => 'Inconsistencia no encontrada.'], 404);
-    }
-
-    // Decidir la acción
-    $resultado = false;
-    if ($accion === 'aprobar') {
-        // 👇 Pasar la acción a tomar al método aprobar
-        $resultado = $inconsistencia->aprobarEtapaActual($id_usuario, $accion_tomar);
-    } elseif ($accion === 'denegar') {
-        $resultado = $inconsistencia->denegar($id_usuario, $motivo);
-    }
-
-    if ($resultado) {
-        return response()->json([
-            'success' => true,
-            'message' => 'Acción ejecutada correctamente.',
-            'nueva_etapa' => $inconsistencia->fresh()->etapa
+    public function accionInconsistencia(Request $request)
+    {
+        $validated = $request->validate([
+            'id_inconsistencia' => 'required|integer',
+            'id_Sdp' => 'required|integer',
+            'accion' => 'required|string|in:aprobar,denegar,en_espera',
+            'motivo' => 'nullable|string',
+            'accion_tomar' => 'nullable|string'
         ]);
-    } else {
-        return response()->json(['success' => false, 'message' => 'No se pudo ejecutar la acción.']);
+
+        $id = $validated['id_inconsistencia'];
+        $id_usuario = $validated['id_Sdp'];
+        $accion = $validated['accion'];
+        $motivo = $validated['motivo'] ?? null;
+        $accion_tomar = $validated['accion_tomar'] ?? null;
+
+        // Buscar inconsistencia
+        $inconsistencia = InconsistenciaModelo::where('id_inconsistencia', $id)->first();
+
+        if (!$inconsistencia) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Inconsistencia no encontrada.'
+            ], 404);
+        }
+
+        try {
+            // Ejecutar la acción correspondiente
+            $resultado = false;
+            $nueva_etapa = null;
+
+            if ($accion === 'aprobar') {
+                $resultado = $this->aprobarInconsistencia($inconsistencia, $id_usuario, $accion_tomar);
+                $nueva_etapa = $inconsistencia->fresh()->etapa;
+            } elseif ($accion === 'denegar') {
+                $resultado = $this->denegarInconsistencia($inconsistencia, $id_usuario, $motivo);
+            } elseif ($accion === 'en_espera') {
+                $resultado = $this->ponerEnEspera($inconsistencia, $id_usuario, $motivo);
+            }
+
+            if ($resultado) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Acción ejecutada correctamente.',
+                    'nueva_etapa' => $nueva_etapa
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo ejecutar la acción.'
+                ], 500);
+            }
+        } catch (\Exception $e) {
+            Log::error('Error en accionInconsistencia: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar la acción: ' . $e->getMessage()
+            ], 500);
+        }
     }
-}
 
+    /**
+     * Aprueba la inconsistencia y avanza a la siguiente etapa
+     */
+    private function aprobarInconsistencia($inconsistencia, $id_usuario, $accion_tomar)
+    {
+        $etapa_actual = $inconsistencia->etapa ?? 'lider';
+        $tipo_inconsistencia = $inconsistencia->tipo_inconsistencia;
 
+        // Obtener siguiente etapa
+        $siguiente_etapa = $this->obtenerSiguienteEtapa($tipo_inconsistencia, $etapa_actual);
+
+        // Preparar datos de actualización
+        $datos_actualizacion = [
+            'etapa' => $siguiente_etapa,
+            'observacion' => null // Limpiar observaciones al aprobar
+        ];
+
+        // Agregar datos según la etapa actual
+        $datos_actualizacion = array_merge(
+            $datos_actualizacion,
+            $this->obtenerDatosAprobacion($etapa_actual, $id_usuario, $accion_tomar)
+        );
+
+        // Si llega a "terminada", cambiar el estado
+        if ($siguiente_etapa === 'terminada') {
+            $datos_actualizacion['estado_inconsistencia'] = 'Aprobada';
+        }
+
+        return $inconsistencia->actualizarEtapa($datos_actualizacion);
+    }
+
+    /**
+     * Deniega la inconsistencia
+     */
+    private function denegarInconsistencia($inconsistencia, $id_usuario, $motivo)
+    {
+        return $inconsistencia->actualizarEstado([
+            'estado_inconsistencia' => 'Denegada',
+            'observacion' => $motivo
+        ]);
+    }
+
+    /**
+     * Pone la inconsistencia en espera
+     */
+    private function ponerEnEspera($inconsistencia, $id_usuario, $motivo)
+    {
+        return $inconsistencia->actualizarEspera([
+            'estado_inconsistencia' => 'espera',
+            'observacion_logistica' => $motivo
+        ]);
+    }
+
+    /**
+     * Obtiene el flujo según el tipo de inconsistencia
+     */
+    private function obtenerFlujo($tipo_inconsistencia)
+    {
+        return self::FLUJOS[$tipo_inconsistencia] ?? self::FLUJOS['default'];
+    }
+
+    /**
+     * Obtiene la siguiente etapa según el flujo
+     */
+    private function obtenerSiguienteEtapa($tipo_inconsistencia, $etapa_actual)
+    {
+        $flujo = $this->obtenerFlujo($tipo_inconsistencia);
+        $indice_actual = array_search($etapa_actual, $flujo);
+
+        if ($indice_actual === false) {
+            return $flujo[1] ?? 'calidad';
+        }
+
+        $siguiente_indice = $indice_actual + 1;
+        return $flujo[$siguiente_indice] ?? 'terminada';
+    }
+
+    /**
+     * Obtiene los datos de aprobación según la etapa
+     */
+    private function obtenerDatosAprobacion($etapa_actual, $id_usuario, $accion_tomar)
+    {
+        $fecha_actual = Carbon::now('America/Bogota');
+        $datos = [];
+
+        switch ($etapa_actual) {
+            case 'lider':
+                $datos['lider_que_aprobo'] = $id_usuario;
+                $datos['fecha_lider'] = $fecha_actual;
+                break;
+
+            case 'calidad':
+                $datos['calidad_que_aprobo'] = $id_usuario;
+                $datos['fecha_calidad'] = $fecha_actual;
+                if ($accion_tomar !== null) {
+                    $datos['accion_inconsistencia'] = $accion_tomar;
+                }
+                break;
+
+            case 'logistica':
+                $datos['logistica_que_aprobo'] = $id_usuario;
+                $datos['fecha_logistica'] = $fecha_actual;
+                break;
+
+            case 'trazo':
+                $datos['trazo_que_aprobo'] = $id_usuario;
+                $datos['fecha_trazo'] = $fecha_actual;
+                break;
+
+            case 'patronaje':
+                $datos['patronaje_que_aprobo'] = $id_usuario;
+                $datos['fecha_patronaje'] = $fecha_actual;
+                break;
+
+            case 'contabilidad':
+                $datos['contabilidad_que_aprobo'] = $id_usuario;
+                $datos['fecha_contabilidad'] = $fecha_actual;
+                break;
+
+            case 'cartera':
+                $datos['cartera_que_aprobo'] = $id_usuario;
+                $datos['fecha_cartera'] = $fecha_actual;
+                break;
+        }
+
+        return $datos;
+    }
 
 
     // HISTORICO INCONSISTENCIAS //

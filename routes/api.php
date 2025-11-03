@@ -285,9 +285,9 @@ Route::prefix('inconsistencias')->group(function () {
      Route::post('/consultar-item', [InconsistenciasController::class, 'ObtenerPVItems']);
      Route::post('/generar_inconsistencia', [InconsistenciasController::class, 'GenerarInconsistencia']);
      Route::get('/usuario/{idUsuario}', [InconsistenciasController::class, 'VerInconsistencia']);
-     Route::post('/anular_inconsistencia', [InconsistenciasController::class, 'anularInconsistencia']);
+     Route::post('/anular_inconsistencia', [InconsistenciasController::class, 'anularInconsistencia']);// anulacion del usuario que la monta
      Route::get('/listar_inconsistencias_departamento', [InconsistenciasController::class, 'listarInconsistenciasPorDepartamento']);
-     Route::post('/accion_inconsistencia', [InconsistenciasController::class, 'accionInconsistencia']); // aprobacion o rechazo del lider
+     Route::post('/accion_inconsistencia', [InconsistenciasController::class, 'accionInconsistencia']); // aprobacion o rechazo de la etapa
      Route::get('/historico', [InconsistenciasController::class,'historicoInconsistencias']);
      Route::get('{id}/tiempos-proceso', [InconsistenciasController::class, 'obtenerTiemposProceso']);
      Route::get('/listas-consumo', [InconsistenciasController::class, 'InconsistenciaConsumo']);

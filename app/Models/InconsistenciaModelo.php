@@ -191,26 +191,127 @@ class InconsistenciaModelo extends Model
      * 🔹 listar inconsistencia de base de datos
      */
 
-    public static function obtenerInconsistenciaUsuario($id_Sdp)
-    {
-        return self::where('solicitante', $id_Sdp)
-            ->orderByDesc('fecha_inconsistencia')
-            ->get();
-    }
+   public static function obtenerTrazabilidadPorUsuario($idUsuario)
+{
+    $data = self::select([
+        'inconsistencias.id',
+        'inconsistencias.id_inconsistencia',
+        'inconsistencias.fecha_inconsistencia',
+        'inconsistencias.Cliente',
+        'inconsistencias.tipo_inconsistencia',
+        'inconsistencias.cantidad_solicitada_op',
+        'inconsistencias.cantidad_inconsistencia',
+        'inconsistencias.item',
+        'inconsistencias.tipo_de_orden',
+        'inconsistencias.precio_unitario',
+        'inconsistencias.precio_total_inconsistencia',
+        'inconsistencias.descripcion_inconsistencia',
+        'inconsistencias.etapa',
+        'inconsistencias.estado_inconsistencia',
+        'inconsistencias.accion_inconsistencia',
+        'inconsistencias.estado_consumo',
+        'inconsistencias.evidencias',
+        'inconsistencias.razon_anulacion',
+        'inconsistencias.fecha_anulacion',
+
+        // Campos del solicitante y demás usuarios
+        'solicitante.nombres as solicitante_nombres',
+        'solicitante.apellidos as solicitante_apellidos',
+        'jefe.nombres as jefe_nombres',
+        'jefe.apellidos as jefe_apellidos',
+        'anulador.nombres as anulador_nombres',
+        'anulador.apellidos as anulador_apellidos',
+        'lider.nombres as lider_nombres',
+        'lider.apellidos as lider_apellidos',
+        'extra.nombres as extra_nombres',
+        'extra.apellidos as extra_apellidos',
+        'calidad.nombres as calidad_nombres',
+        'calidad.apellidos as calidad_apellidos',
+        'logistica.nombres as logistica_nombres',
+        'logistica.apellidos as logistica_apellidos',
+        'cartera.nombres as cartera_nombres',
+        'cartera.apellidos as cartera_apellidos',
+        'patronaje.nombres as patronaje_nombres',
+        'patronaje.apellidos as patronaje_apellidos',
+        'contabilidad.nombres as contabilidad_nombres',
+        'contabilidad.apellidos as contabilidad_apellidos',
+        'trazo.nombres as trazo_nombres',
+        'trazo.apellidos as trazo_apellidos',
+        'espera_persona.nombres as espera_nombres',
+        'espera_persona.apellidos as espera_apellidos',
+        'consumidor.nombres as consumidor_nombres',
+        'consumidor.apellidos as consumidor_apellidos',
+
+        'inconsistencias.fecha_lider',
+        'inconsistencias.fecha_extra',
+        'inconsistencias.fecha_calidad',
+        'inconsistencias.fecha_logistica',
+        'inconsistencias.observacion_logistica',
+        'inconsistencias.fecha_aprobacion_cartera',
+        'inconsistencias.fecha_patronaje',
+        'inconsistencias.fecha_contabilidad',
+        'inconsistencias.fecha_trazo',
+        'inconsistencias.fecha_espera',
+        'inconsistencias.fecha_de_consumo',
+        'inconsistencias.detalles_consumo',
+        'd.nombre_departamento'
+    ])
+    ->leftJoin('usuarios as solicitante', 'inconsistencias.solicitante', '=', 'solicitante.id_usuario')
+    ->leftJoin('usuarios as jefe', 'inconsistencias.jefe_inmediato', '=', 'jefe.id_usuario')
+    ->leftJoin('usuarios as anulador', 'inconsistencias.persona_que_anulo', '=', 'anulador.id_usuario')
+    ->leftJoin('usuarios as lider', 'inconsistencias.lider_que_aprobo', '=', 'lider.id_usuario')
+    ->leftJoin('usuarios as extra', 'inconsistencias.extra_que_aprobo', '=', 'extra.id_usuario')
+    ->leftJoin('usuarios as calidad', 'inconsistencias.calidad_que_aprobo', '=', 'calidad.id_usuario')
+    ->leftJoin('usuarios as logistica', 'inconsistencias.logistica_que_aprobo', '=', 'logistica.id_usuario')
+    ->leftJoin('usuarios as cartera', 'inconsistencias.cartera_que_aprobo', '=', 'cartera.id_usuario')
+    ->leftJoin('usuarios as patronaje', 'inconsistencias.patronaje_que_aprobo', '=', 'patronaje.id_usuario')
+    ->leftJoin('usuarios as contabilidad', 'inconsistencias.contabilidad_que_aprobo', '=', 'contabilidad.id_usuario')
+    ->leftJoin('usuarios as trazo', 'inconsistencias.trazo_que_aprobo', '=', 'trazo.id_usuario')
+    ->leftJoin('usuarios as espera_persona', 'inconsistencias.persona_espera', '=', 'espera_persona.id_usuario')
+    ->leftJoin('usuarios as consumidor', 'inconsistencias.usuario_que_consumio', '=', 'consumidor.id_usuario')
+    ->leftJoin('departamentos as d', 'inconsistencias.departamento', '=', 'd.id_departamento')
+    ->where('inconsistencias.solicitante', $idUsuario)
+    ->orderBy('inconsistencias.fecha_inconsistencia', 'desc')
+    ->orderBy('inconsistencias.id', 'desc')
+    ->get();
+
+    // 🔹 Concatenamos nombres + apellidos en PHP antes de devolver
+    return $data->map(function ($item) {
+        $item->nombre_solicitante = trim(($item->solicitante_nombres ?? '') . ' ' . ($item->solicitante_apellidos ?? ''));
+        $item->nombre_jefe_inmediato = trim(($item->jefe_nombres ?? '') . ' ' . ($item->jefe_apellidos ?? ''));
+        $item->nombre_persona_que_anulo = trim(($item->anulador_nombres ?? '') . ' ' . ($item->anulador_apellidos ?? ''));
+        $item->nombre_lider_aprobo = trim(($item->lider_nombres ?? '') . ' ' . ($item->lider_apellidos ?? ''));
+        $item->nombre_extra_aprobo = trim(($item->extra_nombres ?? '') . ' ' . ($item->extra_apellidos ?? ''));
+        $item->nombre_calidad_aprobo = trim(($item->calidad_nombres ?? '') . ' ' . ($item->calidad_apellidos ?? ''));
+        $item->nombre_logistica_aprobo = trim(($item->logistica_nombres ?? '') . ' ' . ($item->logistica_apellidos ?? ''));
+        $item->nombre_cartera_aprobo = trim(($item->cartera_nombres ?? '') . ' ' . ($item->cartera_apellidos ?? ''));
+        $item->nombre_patronaje_aprobo = trim(($item->patronaje_nombres ?? '') . ' ' . ($item->patronaje_apellidos ?? ''));
+        $item->nombre_contabilidad_aprobo = trim(($item->contabilidad_nombres ?? '') . ' ' . ($item->contabilidad_apellidos ?? ''));
+        $item->nombre_trazo_aprobo = trim(($item->trazo_nombres ?? '') . ' ' . ($item->trazo_apellidos ?? ''));
+        $item->nombre_persona_espera = trim(($item->espera_nombres ?? '') . ' ' . ($item->espera_apellidos ?? ''));
+        $item->nombre_usuario_consumio = trim(($item->consumidor_nombres ?? '') . ' ' . ($item->consumidor_apellidos ?? ''));
+        return $item;
+    });
+}
 
 
     /**
-     * 🔹 Anular inconsistencia en base de datos
+     * Anula una inconsistencia (método ya existente)
+     * 
+     * @param int $idInconsistencia
+     * @param string $razonAnulacion
+     * @param int $idUsuario
+     * @return bool
      */
-    public static function anular($id_inco, $razon_anulacion, $id_usuario)
+    public static function anular($idInconsistencia, $razonAnulacion, $idUsuario)
     {
-        return self::where('id_inconsistencia', $id_inco)
+        return self::where('id', $idInconsistencia)
             ->update([
                 'estado_inconsistencia' => 'Anulada',
-                'razon_anulacion' => $razon_anulacion,
-                'persona_que_anulo' => $id_usuario,
+                'razon_anulacion' => $razonAnulacion,
+                'persona_que_anulo' => $idUsuario,
                 'fecha_anulacion' => now()
-            ]);
+            ]) > 0;
     }
 
 
@@ -219,182 +320,77 @@ class InconsistenciaModelo extends Model
      *  Listar inconsistencias por departamento
      */
 
-    public static function listarPorRol($rol)
-    {
-        $rolNormalizado = strtolower(trim($rol));
-
-        $mapaEtapas = [
-            'lider aprobador (inconsistencias)' => 'lider',
-            'matriz reemplazo(inconsistencias)' => 'matriz',
-            'calidad (inconsistencias)' => 'calidad',
-            'contabilidad (inconsistencias)' => 'contabilidad',
-            'logisitica (inconsistencias)' => 'logistica',
-            'patronaje (inconsistencias)' => 'patronaje',
-            'cartera (inconsistencias)' => 'cartera',
-        ];
-
-        $etapa = $mapaEtapas[$rolNormalizado] ?? null;
-
-        if (!$etapa) {
-            return collect([]);
-        }
-
-        // ✅ Obtener datos sin aplicar casts automáticos
-        return self::select(
-            'inconsistencias.*',
-            'departamentos.nombre_departamento',
-            'usuarios.nombres',
-            'usuarios.apellidos'
-        )
-            ->join('departamentos', 'inconsistencias.departamento', '=', 'departamentos.id_departamento')
-            ->join('usuarios', 'inconsistencias.solicitante', '=', 'usuarios.id_usuario')
-            ->where('inconsistencias.etapa', $etapa)
-            ->where('inconsistencias.estado_inconsistencia', 'Abierta')
-            ->orderByDesc('inconsistencias.id')
-            ->get();
-    }
-
-
-
-
-    /**
-     * 🔹 Aprobar inconsistencia en base de datos
-     */
-    // public function aprobacionLider($id_Sdp, $tipo_inconsistencia)
-    // {
-    //     // Determinar la etapa según el tipo de inconsistencia
-    //     $etapa = 'calidad'; // Por defecto
-
-    //     switch ($tipo_inconsistencia) {
-    //         case 'documental_trazo':
-    //             $etapa = 'trazo';
-    //             break;
-    //         case 'patronaje':
-    //             $etapa = 'patronaje';
-    //             break;
-    //         case 'documental_contabilidad':
-    //             $etapa = 'contabilidad';
-    //             break;
-    //             // Los demás casos ya están cubiertos por el valor por defecto 'calidad'
-    //     }
-
-    //     return $this->update([
-    //         'etapa' => $etapa,
-    //         'lider_que_aprobo' => $id_Sdp,
-    //         'fecha_lider' => now(),
-    //         'observacion' => null
-    //     ]);
-    // }
-
-    /**
-     * Deniega una inconsistencia con motivo.
-     */
-    public function denegarLider($id_usuario, $motivo)
-    {
-        return $this->update([
-            'estado_inconsistencia' => 'Denegada',
-            'observacion' => $motivo
-        ]);
-    }
-
-
-
-
-
-    //FLUJOS //
-
-    private static function obtenerFlujo($tipo_inconsistencia)
-    {
-        $flujos = [
-            'documental trazo' => ['lider', 'trazo', 'calidad', 'logistica', 'terminada'],
-            'error_patronaje' => ['lider', 'patronaje', 'calidad', 'logistica', 'terminada'],
-            'documental calidad' => ['lider', 'calidad', 'terminada'],
-            'documental_contabilidad' => ['lider', 'contabilidad', 'cartera', 'terminada'],
-            'default' => ['lider', 'calidad', 'logistica', 'terminada']
-        ];
-
-        return $flujos[$tipo_inconsistencia] ?? $flujos['default'];
-    }
-
-    /**
-     * Obtiene la siguiente etapa según el flujo
-     */
-    private static function obtenerSiguienteEtapa($tipo_inconsistencia, $etapa_actual)
-    {
-        $flujo = self::obtenerFlujo($tipo_inconsistencia);
-        $indice_actual = array_search($etapa_actual, $flujo);
-
-        if ($indice_actual === false) {
-            return $flujo[1] ?? 'calidad';
-        }
-
-        $siguiente_indice = $indice_actual + 1;
-        return $flujo[$siguiente_indice] ?? 'terminada';
-    }
-
-    /**
-     * Aprueba la etapa actual y avanza a la siguiente
-     */
-    public function aprobarEtapaActual($id_usuario, $accion_tomar)
+public static function listarPorRol($rol)
 {
-    $etapa_actual = $this->etapa ?? 'lider';
-    $tipo_inconsistencia = $this->tipo_inconsistencia;
+    $rolNormalizado = strtolower(trim($rol));
 
-    $siguiente_etapa = self::obtenerSiguienteEtapa($tipo_inconsistencia, $etapa_actual);
-
-    // Determinar qué campos actualizar según la etapa
-    $datos_actualizacion = [
-        'etapa' => $siguiente_etapa,
+    $mapaEtapas = [
+        'lider aprobador (inconsistencias)' => 'lider',
+        'matriz reemplazo(inconsistencias)' => 'matriz',
+        'calidad (inconsistencias)' => 'calidad',
+        'contabilidad (inconsistencias)' => 'contabilidad',
+        'logisitica (inconsistencias)' => 'logistica',
+        'patronaje (inconsistencias)' => 'patronaje',
+        'cartera (inconsistencias)' => 'cartera',
     ];
 
-    // Guardar quién aprobó según la etapa
-    switch ($etapa_actual) {
-        case 'lider':
-            $datos_actualizacion['lider_que_aprobo'] = $id_usuario;
-            $datos_actualizacion['fecha_lider'] = Carbon::now('America/Bogota');
-            break;
-        case 'calidad':
-            $datos_actualizacion['calidad_que_aprobo'] = $id_usuario;
-            $datos_actualizacion['fecha_calidad'] = Carbon::now('America/Bogota');
-            // 👇 Solo guardar acción_inconsistencia si viene desde Calidad
-            if ($accion_tomar !== null) {
-                $datos_actualizacion['accion_inconsistencia'] = $accion_tomar;
-            }
-            break;
-        case 'logistica':
-            $datos_actualizacion['logistica_que_aprobo'] = $id_usuario;
-            $datos_actualizacion['fecha_logistica'] = Carbon::now('America/Bogota');
-            break;
-        case 'trazo':
-            $datos_actualizacion['trazo_que_aprobo'] = $id_usuario;
-            $datos_actualizacion['fecha_trazo'] = Carbon::now('America/Bogota');
-            break;
-        case 'patronaje':
-            $datos_actualizacion['patronaje_que_aprobo'] = $id_usuario;
-            $datos_actualizacion['fecha_patronaje'] = Carbon::now('America/Bogota');
-            break;
-        case 'contabilidad':
-            $datos_actualizacion['contabilidad_que_aprobo'] = $id_usuario;
-            $datos_actualizacion['fecha_contabilidad'] = Carbon::now('America/Bogota');
-            break;
-        case 'cartera':
-            $datos_actualizacion['cartera_que_aprobo'] = $id_usuario;
-            $datos_actualizacion['fecha_cartera'] = Carbon::now('America/Bogota');
-            break;
+    $etapa = $mapaEtapas[$rolNormalizado] ?? null;
+
+    if (!$etapa) {
+        return collect([]);
     }
 
-    // Si llega a "terminada", cambiar el estado
-    if ($siguiente_etapa === 'terminada') {
-        $datos_actualizacion['estado_inconsistencia'] = 'Aprobada';
+    // ✅ Construir la consulta base
+    $query = self::select(
+        'inconsistencias.*',
+        'departamentos.nombre_departamento',
+        'usuarios.nombres',
+        'usuarios.apellidos'
+    )
+        ->join('departamentos', 'inconsistencias.departamento', '=', 'departamentos.id_departamento')
+        ->join('usuarios', 'inconsistencias.solicitante', '=', 'usuarios.id_usuario');
+
+    // ✅ Si es logística, traer solo etapa "logistica" pero con estados "abierta" O "espera"
+    if ($etapa === 'logistica') {
+        $query->where('inconsistencias.etapa', 'logistica')
+              ->whereIn('inconsistencias.estado_inconsistencia', ['abierta', 'espera']);
+    } else {
+        // ✅ Para los demás roles, su etapa correspondiente y solo estado "abierta"
+        $query->where('inconsistencias.etapa', $etapa)
+              ->where('inconsistencias.estado_inconsistencia', 'abierta');
     }
 
-    $datos_actualizacion['observacion'] = null; // Limpiar observaciones al aprobar
-
-    return $this->update($datos_actualizacion);
+    return $query->orderByDesc('inconsistencias.id')->get();
 }
 
 
+
+
+  /**
+     * Actualiza el estado y observación de la inconsistencia
+     */
+    public function actualizarEstado(array $datos)
+    {
+        return $this->update($datos);
+    }
+
     /**
+     * Actualiza la etapa y datos de aprobación
+     */
+    public function actualizarEtapa(array $datos)
+    {
+        return $this->update($datos);
+    }
+
+    /**
+     * Pone la inconsistencia en espera
+     */
+    public function actualizarEspera(array $datos)
+    {
+        return $this->update($datos);
+    }
+
+  /**
      * Deniega la inconsistencia
      */
     public function denegar($id_usuario, $motivo)
@@ -404,6 +400,8 @@ class InconsistenciaModelo extends Model
             'observacion' => $motivo
         ]);
     }
+
+
 
 
     // HISTORICO INCONSISTENCIAS //

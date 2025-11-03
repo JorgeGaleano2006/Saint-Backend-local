@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Usuario extends Model
+class InconsistenciaUsuario extends Model
 {
     protected $connection = 'solicitud_de_permisos_local';
     protected $table = 'usuarios';

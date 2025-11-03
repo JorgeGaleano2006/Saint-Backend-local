@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Departamento extends Model
+class InconsistenciaDepartamento extends Model
 {
     protected $connection = 'solicitud_de_permisos_local';
     protected $table = 'departamentos';
@@ -20,11 +20,11 @@ class Departamento extends Model
     // Relaciones
     public function usuarios()
     {
-        return $this->hasMany(Usuario::class, 'id_departamento');
+        return $this->hasMany(InconsistenciaUsuario::class, 'id_departamento');
     }
 
     public function inconsistencias()
     {
-        return $this->hasMany(Inconsistencia::class, 'id_departamento');
+        return $this->hasMany(InconsistenciaModelo::class, 'id_departamento');
     }
 }
