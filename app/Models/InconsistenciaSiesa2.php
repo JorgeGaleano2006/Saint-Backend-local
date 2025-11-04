@@ -41,6 +41,10 @@ class InconsistenciaSiesa2 extends Model
         })
         ->join('t430_cm_pv_docto as cab', 'cab.f430_rowid', '=', 'mov.f431_rowid_pv_docto')
         ->join('t200_mm_terceros as cli', 'cli.f200_rowid', '=', 'cab.f430_rowid_tercero_fact')
+        ->leftJoin('t054_mm_estados as est', function($join) {
+            $join->on('est.f054_id', '=', 'cab.f430_ind_estado')
+                 ->on('est.f054_id_grupo_clase_docto', '=', 'cab.f430_id_grupo_clase_docto');
+        })
         ->select([
             'mov.f431_rowid_pv_docto as numero_pv',
             'i.f120_id',
@@ -60,6 +64,7 @@ class InconsistenciaSiesa2 extends Model
             'cab.f430_num_docto_referencia as oc_cliente',
             'cli.f200_razon_social as cliente',
             'cab.f430_notas as notas_completas',
+            'est.f054_descripcion as estado_op',
             DB::raw("
                 CASE 
                     WHEN PATINDEX('%PT %', cab.f430_notas) > 0 THEN
@@ -86,5 +91,6 @@ class InconsistenciaSiesa2 extends Model
         ->orderBy('col_det.f117_descripcion')
         ->get();
 }
+
 
 }

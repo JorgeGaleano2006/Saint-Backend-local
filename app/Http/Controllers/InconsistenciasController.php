@@ -415,7 +415,8 @@ class InconsistenciasController extends Controller
                 'precio_unitario' => 'required|string',
                 'precio_total' => 'nullable|string',
                 'situacion' => 'required|string',
-                'accion' => 'nullable|string'
+                'accion' => 'nullable|string',
+                'estado_op' => 'nullable|string|max:100'
             ];
 
             // Agregar validación de imágenes si el tipo lo requiere
@@ -485,7 +486,8 @@ class InconsistenciasController extends Controller
                 'estado_inconsistencia' => 'abierta',
                 'id_inconsistencia' => $request->input('codigo_inconsistencia'),
                 'solicitante' => $request->input('id_solicitante'),
-                'descripcion_inconsistencia' => $request->input('situacion')
+                'descripcion_inconsistencia' => $request->input('situacion'),
+                'estado_orden' => $request->input('estado_op')
             ];
 
             // ✅ Solo agregar acción si viene en el request
@@ -821,7 +823,7 @@ class InconsistenciasController extends Controller
      * 🔹 Aprobar o denegar una inconsistencia
      */
  private const FLUJOS = [
-        'documental trazo' => ['lider', 'trazo', 'calidad', 'logistica', 'terminada'],
+        'ajuste promedio' => ['lider', 'trazo', 'calidad', 'logistica', 'terminada'],
         'error_patronaje' => ['lider', 'patronaje', 'calidad', 'logistica', 'terminada'],
         'documental calidad' => ['lider', 'calidad', 'terminada'],
         'documental_contabilidad' => ['lider', 'contabilidad', 'cartera', 'terminada'],
@@ -1048,7 +1050,7 @@ public function obtenerTiemposProceso($id)
 
     // 🔹 Definir flujos según tipo de inconsistencia
     $flujos = [
-        'documental trazo' => ['lider', 'trazo', 'calidad', 'logistica'],
+        'ajuste promedio' => ['lider', 'trazo', 'calidad', 'logistica'],
         'error_patronaje' => ['lider', 'patronaje', 'calidad', 'logistica'],
         'documental_calidad' => ['lider', 'calidad'],
         'documental_contabilidad' => ['lider', 'contabilidad', 'cartera'],

@@ -51,7 +51,8 @@ class InconsistenciaModelo extends Model
         'usuario_que_consumio',
         'fecha_de_consumo',
         'fecha_patronaje',
-        'patronaje_que_aprobo'
+        'patronaje_que_aprobo',
+        'estado_orden'
     ];
 
 
