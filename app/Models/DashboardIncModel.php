@@ -73,7 +73,8 @@ class DashboardIncModel extends Model
             'duracion_total_proceso' => self::getDuracionTotalProceso($filtros),
             'porcentaje_en_espera' => self::getPorcentajeEnEspera($filtros),
             'promedio_por_usuario' => self::getPromedioInconsistenciasPorUsuario($filtros),
-            'promedio_por_departamento' => self::getPromedioInconsistenciasPorDepartamento($filtros)
+            'promedio_por_departamento' => self::getPromedioInconsistenciasPorDepartamento($filtros),
+            'usuarios_top_reportes' => self::getTopReporteUsers($filtros)
         ];
 
         return $datos;
@@ -159,6 +160,49 @@ class DashboardIncModel extends Model
         
         return $query->orderByDesc('cantidad')->get();
     }
+    
+
+   public static function getTopReporteUsers($filtros)
+{
+    $query = self::from('inconsistencias as i')
+        ->join('usuarios as u', 'i.persona_que_anulo', '=', 'u.id_usuario')
+        ->selectRaw('
+            u.id_usuario AS id_usuario,
+            CONCAT(u.nombres, " ", u.apellidos) AS nombre_completo,
+            COUNT(*) AS total_denegadas
+        ')
+        ->where('i.estado_inconsistencia', 'Denegada')
+        ->groupBy('u.id_usuario', 'u.nombres', 'u.apellidos')
+        ->orderByDesc('total_denegadas');
+
+    // 🔹 Aplicar filtros opcionales si los recibes del frontend:
+    if (!empty($filtros['fecha_inicio']) && !empty($filtros['fecha_fin'])) {
+        $query->whereBetween('i.fecha_creacion', [$filtros['fecha_inicio'], $filtros['fecha_fin']]);
+    }
+
+    if (!empty($filtros['departamento'])) {
+        $query->where('i.departamento', $filtros['departamento']);
+    }
+
+    if (!empty($filtros['cliente'])) {
+        $query->where('i.cliente', $filtros['cliente']);
+    }
+
+    if (!empty($filtros['tipo_inconsistencia'])) {
+        $query->where('i.tipo_inconsistencia', $filtros['tipo_inconsistencia']);
+    }
+
+    if (!empty($filtros['solicitante'])) {
+        $query->where('i.id_usuario', $filtros['solicitante']);
+    }
+
+    if (!empty($filtros['tipo_de_orden'])) {
+        $query->where('i.tipo_de_orden', $filtros['tipo_de_orden']);
+    }
+
+    return $query->get();
+}
+
 
     // ==================== MÉTRICAS DE COSTOS ====================
     

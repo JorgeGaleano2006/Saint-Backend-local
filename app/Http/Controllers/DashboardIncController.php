@@ -162,4 +162,26 @@ class DashboardIncController extends Controller
             'data' => $data
         ]);
     }
+
+    public function getTopReporteUsers(Request $request): JsonResponse
+    {
+        $filtros = $request->only([
+            'fecha_inicio',
+            'fecha_fin',
+            'departamento',
+            'cliente',
+            'tipo_inconsistencia',
+            'etapa',
+            'solicitante',
+            'estado_consumo',
+            'tipo_de_orden'
+        ]);
+
+        $topUsers = DashboardIncModel::getTopReporteUsers($filtros);
+
+        return response()->json([
+            'success' => true,
+            'data' => $topUsers
+        ]);
+    }
 }

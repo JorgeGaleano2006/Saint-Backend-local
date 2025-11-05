@@ -473,7 +473,7 @@ class InconsistenciasController extends Controller
                 'codigo_inconsistencia' => $request->input('codigo_inconsistencia'),
                 'correo_solicitante' => $request->input('correo_solicitante'),
                 'tipo_inconsistencia' => $tipoInconsistencia,
-                'cantidad_solicitada_op' => $cantidadSolicitada,
+                'cantidad_solicitadajuste_promedia_op' => $cantidadSolicitada,
                 'cantidad_inconsistencia' => $cantidadInco,
                 'unidad_medida' => $request->input('unidad_medida'),
                 'item' => $request->input('item'),
@@ -823,7 +823,7 @@ class InconsistenciasController extends Controller
      * 🔹 Aprobar o denegar una inconsistencia
      */
  private const FLUJOS = [
-        'ajuste promedio' => ['lider', 'trazo', 'calidad', 'logistica', 'terminada'],
+        'ajuste_promedio' => ['lider', 'trazo', 'calidad', 'logistica', 'terminada'],
         'error_patronaje' => ['lider', 'patronaje', 'calidad', 'logistica', 'terminada'],
         'documental calidad' => ['lider', 'calidad', 'terminada'],
         'documental_contabilidad' => ['lider', 'contabilidad', 'cartera', 'terminada'],
@@ -929,7 +929,8 @@ class InconsistenciasController extends Controller
     {
         return $inconsistencia->actualizarEstado([
             'estado_inconsistencia' => 'Denegada',
-            'observacion' => $motivo
+            'razon_anulacion' => $motivo,
+            'persona_que_anulo' => $id_usuario
         ]);
     }
 
@@ -1050,7 +1051,7 @@ public function obtenerTiemposProceso($id)
 
     // 🔹 Definir flujos según tipo de inconsistencia
     $flujos = [
-        'ajuste promedio' => ['lider', 'trazo', 'calidad', 'logistica'],
+        'ajuste_promedio' => ['lider', 'trazo', 'calidad', 'logistica'],
         'error_patronaje' => ['lider', 'patronaje', 'calidad', 'logistica'],
         'documental_calidad' => ['lider', 'calidad'],
         'documental_contabilidad' => ['lider', 'contabilidad', 'cartera'],

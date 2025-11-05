@@ -333,6 +333,7 @@ public static function listarPorRol($rol)
         'logisitica (inconsistencias)' => 'logistica',
         'patronaje (inconsistencias)' => 'patronaje',
         'cartera (inconsistencias)' => 'cartera',
+        'trazo (inconsistencias)' => 'trazo',
     ];
 
     $etapa = $mapaEtapas[$rolNormalizado] ?? null;

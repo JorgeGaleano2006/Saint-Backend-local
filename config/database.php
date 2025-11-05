@@ -97,6 +97,22 @@ return [
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
         ],
+             'colaboradores' => [
+            'driver' => 'mysql',
+            'host' => env('COLABORADORES_DB_HOST', 'localhost'),
+            'port' => env('COLABORADORES_DB_PORT', '3306'),
+            'database' => env('COLABORADORES_DB_DATABASE', 'providencia_solicitud_de_permisos'),
+            'username' => env('COLABORADORES_DB_USERNAME', 'providencia_solicitud_de_permisos_laborales'),
+            'password' => env('COLABORADORES_DB_PASSWORD', 'Pr0v1d3nc14$#2025*'),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+            ]) : [],
+        ],
         
         'terminacion_empaque' => [
             'driver' => 'mysql',
