@@ -594,7 +594,7 @@ class InconsistenciasController extends Controller
     }
 
 
-      public function VerInconsistencia($idUsuario)
+    public function VerInconsistencia($idUsuario)
     {
         try {
             // Obtener inconsistencias del modelo
@@ -614,19 +614,19 @@ class InconsistenciasController extends Controller
                 if ($inconsistencia->evidencias) {
                     $inconsistencia->evidencias = json_decode($inconsistencia->evidencias, true);
                 }
-                
+
                 // Procesar detalles de consumo (convertir de JSON string a array si existe)
                 if ($inconsistencia->detalles_consumo) {
                     $inconsistencia->detalles_consumo = json_decode($inconsistencia->detalles_consumo, true);
                 }
-                
+
                 // Construir el historial de aprobaciones
                 $inconsistencia->historial_aprobaciones = $this->construirHistorialAprobaciones($inconsistencia);
-                
+
                 // Determinar si puede ser anulada (solo si está abierta y no ha sido terminada)
-                $inconsistencia->puede_anular = in_array($inconsistencia->estado_inconsistencia, ['abierta', null]) 
+                $inconsistencia->puede_anular = in_array($inconsistencia->estado_inconsistencia, ['abierta', null])
                     && $inconsistencia->etapa !== 'terminada';
-                
+
                 return $inconsistencia;
             });
 
@@ -635,7 +635,6 @@ class InconsistenciasController extends Controller
                 'message' => 'Inconsistencias obtenidas correctamente.',
                 'data' => $inconsistenciasProcesadas
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
@@ -654,7 +653,7 @@ class InconsistenciasController extends Controller
     private function construirHistorialAprobaciones($inconsistencia)
     {
         $historial = [];
-        
+
         // Orden cronológico de etapas
         $etapas = [
             'lider' => [
@@ -699,7 +698,7 @@ class InconsistenciasController extends Controller
                 'fecha' => $inconsistencia->fecha_espera
             ]
         ];
-        
+
         foreach ($etapas as $clave => $etapa) {
             if ($etapa['fecha']) {
                 $historial[] = [
@@ -710,7 +709,7 @@ class InconsistenciasController extends Controller
                 ];
             }
         }
-        
+
         // Agregar información de anulación si existe
         if ($inconsistencia->estado_inconsistencia === 'Anulada' && $inconsistencia->razon_anulacion) {
             $historial[] = [
@@ -720,7 +719,7 @@ class InconsistenciasController extends Controller
                 'observacion' => $inconsistencia->razon_anulacion
             ];
         }
-        
+
         // Agregar información de consumo si existe
         if ($inconsistencia->estado_consumo === 'CONSUMIDO') {
             $historial[] = [
@@ -730,7 +729,7 @@ class InconsistenciasController extends Controller
                 'observacion' => 'Estado de consumo completado'
             ];
         }
-        
+
         return $historial;
     }
 
@@ -770,7 +769,7 @@ class InconsistenciasController extends Controller
     /**
      * 🔹 Anular una inconsistencia
      */
-    
+
 
 
 
@@ -822,7 +821,7 @@ class InconsistenciasController extends Controller
     /**
      * 🔹 Aprobar o denegar una inconsistencia
      */
- private const FLUJOS = [
+    private const FLUJOS = [
         'ajuste_promedio' => ['lider', 'trazo', 'calidad', 'logistica', 'terminada'],
         'error_patronaje' => ['lider', 'patronaje', 'calidad', 'logistica', 'terminada'],
         'documental calidad' => ['lider', 'calidad', 'terminada'],
@@ -883,7 +882,7 @@ class InconsistenciasController extends Controller
                 ], 500);
             }
         } catch (\Exception $e) {
-            Log::error('Error en accionInconsistencia: ' . $e->getMessage());
+            \Log::error('Error en accionInconsistencia: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Error al procesar la acción: ' . $e->getMessage()
@@ -917,7 +916,30 @@ class InconsistenciasController extends Controller
         // Si llega a "terminada", cambiar el estado
         if ($siguiente_etapa === 'terminada') {
             $datos_actualizacion['estado_inconsistencia'] = 'Aprobada';
+
+            // Obtener correo del usuario
+            $correo = null;
+
+            if (!empty($inconsistencia->usuario) && !empty($inconsistencia->usuario->correo)) {
+                $correo = $inconsistencia->usuario->correo;
+            } elseif (!empty($id_usuario)) {
+                $usuario = \App\Models\User::find($id_usuario);
+                $correo = $usuario->correo ?? null;
+            }
+
+            // Log para depuración
+            \Log::info('Correo del usuario asociado a la inconsistencia:', [
+                'id_inconsistencia' => $inconsistencia->id,
+                'usuario_id' => $id_usuario ?? null,
+                'correo' => $correo,
+            ]);
+
+            // Enviar correo si existe
+            if (!empty($correo)) {
+                \App\Services\EmailService::sendAprobacionInconsistencia($inconsistencia);
+            }
         }
+
 
         return $inconsistencia->actualizarEtapa($datos_actualizacion);
     }
@@ -1032,234 +1054,229 @@ class InconsistenciasController extends Controller
         return response()->json($datos);
     }
 
-public function obtenerTiemposProceso($id)
-{
-    $inco = InconsistenciaModelo::obtenerTiemposProceso($id);
+    public function obtenerTiemposProceso($id)
+    {
+        $inco = InconsistenciaModelo::obtenerTiemposProceso($id);
 
-    if (!$inco) {
-        return response()->json(['error' => 'Inconsistencia no encontrada'], 404);
-    }
-
-    // 🔹 Estado general
-    if (!is_null($inco->persona_que_anulo)) {
-        $estado = 'Anulada';
-    } elseif ($inco->etapa != 'terminada') {
-        $estado = 'En proceso';
-    } else {
-        $estado = 'Terminada';
-    }
-
-    // 🔹 Definir flujos según tipo de inconsistencia
-    $flujos = [
-        'ajuste_promedio' => ['lider', 'trazo', 'calidad', 'logistica'],
-        'error_patronaje' => ['lider', 'patronaje', 'calidad', 'logistica'],
-        'documental_calidad' => ['lider', 'calidad'],
-        'documental_contabilidad' => ['lider', 'contabilidad', 'cartera'],
-        'default' => ['lider', 'calidad', 'logistica']
-    ];
-
-    // Determinar el flujo según el tipo de inconsistencia
-    $tipoInco = strtolower(trim($inco->tipo_inconsistencia ?? ''));
-    $flujoActual = $flujos[$tipoInco] ?? $flujos['default'];
-
-    // 🔹 Determinar fecha de finalización según el tipo
-    $fechaFinalizacion = ($tipoInco === 'documental_contabilidad')
-        ? $inco->fecha_aprobacion_cartera
-        : $inco->fecha_de_consumo;
-
-    // 🔹 Calcular tiempos dinámicamente según el flujo
-    $tiempos = $this->calcularTiemposFlujo($inco, $flujoActual, $fechaFinalizacion);
-
-    // 🔹 Construir objeto de fechas dinámicamente
-    $fechas = [
-        'creacion' => $inco->fecha_inconsistencia,
-    ];
-
-    // ✅ Agregar todas las fechas del flujo
-    foreach ($flujoActual as $etapa) {
-        $campoFecha = "fecha_$etapa";
-        $fechas[$etapa] = $inco->$campoFecha ?? null;
-    }
-
-    $fechas['terminado'] = $fechaFinalizacion;
-
-    return response()->json([
-        'id' => $inco->id,
-        'codigo' => $inco->id_inconsistencia,
-        'estado' => $estado,
-        'tipo_inconsistencia' => $inco->tipo_inconsistencia,
-        'flujo' => $flujoActual,
-        'etapa_actual' => $inco->etapa,
-        'fechas' => $fechas,
-        'tiempos' => $tiempos,
-        'debug_inco' => $inco->toArray(),
-    ]);
-}
-
-private function calcularTiemposFlujo($inco, $flujo, $fechaFinalizacion)
-{
-    $tiempos = [];
-    $fechaInicio = $inco->fecha_inconsistencia;
-    $fechaAnterior = $fechaInicio;
-
-    foreach ($flujo as $etapa) {
-        $campoFecha = "fecha_$etapa";
-        $fechaActual = $inco->$campoFecha ?? null;
-
-        if ($fechaActual && $fechaAnterior) {
-            $tiempos[$etapa] = $this->diferenciaHoras($fechaAnterior, $fechaActual);
-            $fechaAnterior = $fechaActual;
-        } else {
-            $tiempos[$etapa] = null;
+        if (!$inco) {
+            return response()->json(['error' => 'Inconsistencia no encontrada'], 404);
         }
+
+        // 🔹 Estado general
+        if (!is_null($inco->persona_que_anulo)) {
+            $estado = 'Anulada';
+        } elseif ($inco->etapa != 'terminada') {
+            $estado = 'En proceso';
+        } else {
+            $estado = 'Terminada';
+        }
+
+        // 🔹 Definir flujos según tipo de inconsistencia
+        $flujos = [
+            'ajuste_promedio' => ['lider', 'trazo', 'calidad', 'logistica'],
+            'error_patronaje' => ['lider', 'patronaje', 'calidad', 'logistica'],
+            'documental_calidad' => ['lider', 'calidad'],
+            'documental_contabilidad' => ['lider', 'contabilidad', 'cartera'],
+            'default' => ['lider', 'calidad', 'logistica']
+        ];
+
+        // Determinar el flujo según el tipo de inconsistencia
+        $tipoInco = strtolower(trim($inco->tipo_inconsistencia ?? ''));
+        $flujoActual = $flujos[$tipoInco] ?? $flujos['default'];
+
+        // 🔹 Determinar fecha de finalización según el tipo
+        $fechaFinalizacion = ($tipoInco === 'documental_contabilidad')
+            ? $inco->fecha_aprobacion_cartera
+            : $inco->fecha_de_consumo;
+
+        // 🔹 Calcular tiempos dinámicamente según el flujo
+        $tiempos = $this->calcularTiemposFlujo($inco, $flujoActual, $fechaFinalizacion);
+
+        // 🔹 Construir objeto de fechas dinámicamente
+        $fechas = [
+            'creacion' => $inco->fecha_inconsistencia,
+        ];
+
+        // ✅ Agregar todas las fechas del flujo
+        foreach ($flujoActual as $etapa) {
+            $campoFecha = "fecha_$etapa";
+            $fechas[$etapa] = $inco->$campoFecha ?? null;
+        }
+
+        $fechas['terminado'] = $fechaFinalizacion;
+
+        return response()->json([
+            'id' => $inco->id,
+            'codigo' => $inco->id_inconsistencia,
+            'estado' => $estado,
+            'tipo_inconsistencia' => $inco->tipo_inconsistencia,
+            'flujo' => $flujoActual,
+            'etapa_actual' => $inco->etapa,
+            'fechas' => $fechas,
+            'tiempos' => $tiempos,
+            'debug_inco' => $inco->toArray(),
+        ]);
     }
 
-    // Calcular tiempo desde la última etapa hasta la finalización
-    if ($fechaAnterior && $fechaFinalizacion) {
-        $tiempos['finalizacion'] = $this->diferenciaHoras($fechaAnterior, $fechaFinalizacion);
+    private function calcularTiemposFlujo($inco, $flujo, $fechaFinalizacion)
+    {
+        $tiempos = [];
+        $fechaInicio = $inco->fecha_inconsistencia;
+        $fechaAnterior = $fechaInicio;
+
+        foreach ($flujo as $etapa) {
+            $campoFecha = "fecha_$etapa";
+            $fechaActual = $inco->$campoFecha ?? null;
+
+            if ($fechaActual && $fechaAnterior) {
+                $tiempos[$etapa] = $this->diferenciaHoras($fechaAnterior, $fechaActual);
+                $fechaAnterior = $fechaActual;
+            } else {
+                $tiempos[$etapa] = null;
+            }
+        }
+
+        // Calcular tiempo desde la última etapa hasta la finalización
+        if ($fechaAnterior && $fechaFinalizacion) {
+            $tiempos['finalizacion'] = $this->diferenciaHoras($fechaAnterior, $fechaFinalizacion);
+        }
+
+        // Calcular tiempo total
+        $tiempos['total'] = $this->diferenciaHoras($fechaInicio, $fechaFinalizacion);
+
+        return $tiempos;
     }
 
-    // Calcular tiempo total
-    $tiempos['total'] = $this->diferenciaHoras($fechaInicio, $fechaFinalizacion);
+    private function diferenciaHoras($inicio, $fin)
+    {
+        if (!$inicio || !$fin) {
+            return null;
+        }
 
-    return $tiempos;
-}
+        $inicio = Carbon::parse($inicio);
+        $fin = Carbon::parse($fin);
 
-private function diferenciaHoras($inicio, $fin)
-{
-    if (!$inicio || !$fin) {
-        return null;
+        $diffMinutos = $inicio->diffInMinutes($fin);
+        $diffHoras = intdiv($diffMinutos, 60);
+        $minutos = $diffMinutos % 60;
+        $diffDias = $inicio->diffInDays($fin);
+
+        return [
+            'dias' => $diffDias,
+            'horas' => $diffHoras,
+            'minutos' => $minutos,
+            'total_minutos' => $diffMinutos,
+        ];
     }
-
-    $inicio = Carbon::parse($inicio);
-    $fin = Carbon::parse($fin);
-
-    $diffMinutos = $inicio->diffInMinutes($fin);
-    $diffHoras = intdiv($diffMinutos, 60);
-    $minutos = $diffMinutos % 60;
-    $diffDias = $inicio->diffInDays($fin);
-
-    return [
-        'dias' => $diffDias,
-        'horas' => $diffHoras,
-        'minutos' => $minutos,
-        'total_minutos' => $diffMinutos,
-    ];
-}
 
 
 
     //====== INCONSISTENCIAS POR CONSUMIR ======== /
 
-   public function InconsistenciaConsumo()
-{
-    try {
-        $inconsistencias = InconsistenciaModelo::obtenerInconsistenciasListasParaConsumir();
-        
-        return response()->json($inconsistencias, 200);
-        
-    } catch (\Exception $e) {
-        return response()->json([
-            'message' => 'Error al obtener las inconsistencias listas para consumir',
-            'error' => $e->getMessage()
-        ], 500);
+    public function InconsistenciaConsumo()
+    {
+        try {
+            $inconsistencias = InconsistenciaModelo::obtenerInconsistenciasListasParaConsumir();
+
+            return response()->json($inconsistencias, 200);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al obtener las inconsistencias listas para consumir',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    public function consumirInconsistencia(Request $request)
+    {
+        try {
+            $idInconsistencia = $request->input('id_inconsistencia');
+            $tipoConsumo = $request->input('tipo_consumo');
+
+            // 🧩 Validaciones básicas
+            if (!$idInconsistencia || !$tipoConsumo) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Faltan parámetros requeridos.'
+                ], 400);
+            }
+
+            // 👇 Validar tipos de consumo permitidos
+            $tiposPermitidos = ['consumo', 'gasto', 'devolucion'];
+            if (!in_array($tipoConsumo, $tiposPermitidos)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tipo de consumo no válido. Valores permitidos: consumo, gasto, devolucion.'
+                ], 400);
+            }
+
+            // 📦 Construir el objeto de detalles según el tipo
+            $detallesConsumo = ['tipo_consumo' => ucfirst($tipoConsumo)];
+
+            switch ($tipoConsumo) {
+                case 'consumo':
+                    $codigoTrn = $request->input('codigo_trn');
+                    $codigoConsumo = $request->input('codigo_consumo');
+
+                    if (!$codigoTrn || !$codigoConsumo) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Para tipo "consumo" se requieren codigo_trn y codigo_consumo.'
+                        ], 400);
+                    }
+
+                    $detallesConsumo['trn'] = $codigoTrn;
+                    $detallesConsumo['codigo_consumo'] = $codigoConsumo;
+                    break;
+
+                case 'gasto':
+                    $codigoSrc = $request->input('codigo_validacion');
+
+                    if (!$codigoSrc) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Para tipo "gasto" se requiere codigo_validacion (SRC).'
+                        ], 400);
+                    }
+
+                    $detallesConsumo['codigo_src'] = $codigoSrc;
+                    break;
+
+                case 'devolucion':
+                    $codigoEi = $request->input('codigo_validacion');
+
+                    if (!$codigoEi) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Para tipo "devolucion" se requiere codigo_validacion (EI).'
+                        ], 400);
+                    }
+
+                    $detallesConsumo['codigo_ei'] = $codigoEi;
+                    break;
+            }
+
+            // 💾 Registrar el consumo
+            $resultado = InconsistenciaModelo::RegistrarConsumo($idInconsistencia, $detallesConsumo);
+
+            if ($resultado) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'El consumo fue registrado correctamente.',
+                    'detalles' => $detallesConsumo
+                ], 200);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se encontró la inconsistencia o no se pudo actualizar.'
+                ], 404);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar la solicitud: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
-
-
-public function consumirInconsistencia(Request $request)
-{
-    try {
-        $idInconsistencia = $request->input('id_inconsistencia');
-        $tipoConsumo = $request->input('tipo_consumo');
-
-        // 🧩 Validaciones básicas
-        if (!$idInconsistencia || !$tipoConsumo) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Faltan parámetros requeridos.'
-            ], 400);
-        }
-
-        // 👇 Validar tipos de consumo permitidos
-        $tiposPermitidos = ['consumo', 'gasto', 'devolucion'];
-        if (!in_array($tipoConsumo, $tiposPermitidos)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tipo de consumo no válido. Valores permitidos: consumo, gasto, devolucion.'
-            ], 400);
-        }
-
-        // 📦 Construir el objeto de detalles según el tipo
-        $detallesConsumo = ['tipo_consumo' => ucfirst($tipoConsumo)];
-
-        switch ($tipoConsumo) {
-            case 'consumo':
-                $codigoTrn = $request->input('codigo_trn');
-                $codigoConsumo = $request->input('codigo_consumo');
-                
-                if (!$codigoTrn || !$codigoConsumo) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Para tipo "consumo" se requieren codigo_trn y codigo_consumo.'
-                    ], 400);
-                }
-                
-                $detallesConsumo['trn'] = $codigoTrn;
-                $detallesConsumo['codigo_consumo'] = $codigoConsumo;
-                break;
-
-            case 'gasto':
-                $codigoSrc = $request->input('codigo_validacion');
-                
-                if (!$codigoSrc) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Para tipo "gasto" se requiere codigo_validacion (SRC).'
-                    ], 400);
-                }
-                
-                $detallesConsumo['codigo_src'] = $codigoSrc;
-                break;
-
-            case 'devolucion':
-                $codigoEi = $request->input('codigo_validacion');
-                
-                if (!$codigoEi) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Para tipo "devolucion" se requiere codigo_validacion (EI).'
-                    ], 400);
-                }
-                
-                $detallesConsumo['codigo_ei'] = $codigoEi;
-                break;
-        }
-
-        // 💾 Registrar el consumo
-        $resultado = InconsistenciaModelo::RegistrarConsumo($idInconsistencia, $detallesConsumo);
-
-        if ($resultado) {
-            return response()->json([
-                'success' => true,
-                'message' => 'El consumo fue registrado correctamente.',
-                'detalles' => $detallesConsumo
-            ], 200);
-        } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'No se encontró la inconsistencia o no se pudo actualizar.'
-            ], 404);
-        }
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Error al procesar la solicitud: ' . $e->getMessage()
-        ], 500);
-    }
-}
-}
-
-
-

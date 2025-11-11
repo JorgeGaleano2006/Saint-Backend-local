@@ -19,21 +19,32 @@ class PrecintosAsignadoModelo extends Model
         'firmado_por'
     ];
 
-    public static function obtenerPrecintosPorResponsable($userId)
-    {
-        return DB::connection('providencia_renueva_bigbag') // 👈 Actualizado
-            ->table('entrega_precintos_bigbag as epb')
-            ->join(
-                'reporte_llegada_empaques as rle',
-                'epb.id_reporte_llegada',
-                '=',
-                'rle.id_reporte_llegada_empaque'
-            )
-            ->select('epb.*', 'rle.num_recepcion')
-            ->where('epb.id_responsable', $userId)
-            ->orderByDesc('epb.created_at')
-            ->get();
-    }
+   public static function obtenerPrecintosPorResponsable($userId)
+{
+    return DB::connection('providencia_renueva_bigbag')
+        ->table('entrega_precintos_bigbag as epb')
+        ->join(
+            'reporte_llegada_empaques as rle',
+            'epb.id_reporte_llegada',
+            '=',
+            'rle.id_reporte_llegada_empaque'
+        )
+        ->select(
+            'epb.*',
+            // Información adicional de la recepción
+            'rle.num_recepcion',
+            'rle.fecha_ingreso',
+            'rle.hora_llegada',
+            'rle.planta',
+            'rle.num_remision',
+            'rle.nom_conductor',
+            'rle.placa_vehiculo',
+            'rle.cliente'
+        )
+        ->where('epb.id_responsable', $userId)
+        ->orderByDesc('epb.created_at')
+        ->get();
+}
 
     public static function obtenerPrecintoConNovedad($precintoId)
     {
