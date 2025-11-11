@@ -14,68 +14,79 @@ class AuthController extends Controller
      * Login con hash SHA512 y JWT RS256
      */
     public function login(Request $request)
-    {
-        $request->validate([
-            'email'    => 'required|email',
-            'password' => 'required'
-        ]);
+{
+    $request->validate([
+        'email'    => 'required|email',
+        'password' => 'required'
+    ]);
 
-        // Cargar usuario con sus roles
-        $user = User::with('roles')->where('email', $request->email)->first();
+    // Buscar usuario junto con sus roles
+    $user = User::with('roles')->where('email', $request->email)->first();
 
-        if (!$user) {
-            return response()->json(['success' => false, 'message' => 'Usuario no encontrado'], 401);
-        }
-
-        if (!$user->enabled) {
-            return response()->json(['success' => false, 'message' => 'Usuario deshabilitado'], 403);
-        }
-
-        // Validar contraseña SHA512
-        $hashedInput = hash('sha512', $request->password);
-        if (!hash_equals($hashedInput, $user->password)) {
-            return response()->json(['success' => false, 'message' => 'Contraseña incorrecta'], 401);
-        }
-
-        // Cargar clave privada
-        $privateKey = file_get_contents(env('JWT_PRIVATE_KEY_PATH'));
-
-        // Access Token
-        $accessPayload = [
-            'sub'   => $user->id,
-            'email' => $user->email,
-            'iat'   => time(),
-            'exp'   => time() + env('JWT_EXPIRE_TIME', 3600),
-            'type'  => 'access'
-        ];
-        $accessToken = JWT::encode($accessPayload, $privateKey, 'RS256');
-
-        // Refresh Token
-        $refreshPayload = [
-            'sub'   => $user->id,
-            'email' => $user->email,
-            'iat'   => time(),
-            'exp'   => time() + env('JWT_REFRESH_EXPIRE_TIME', 604800),
-            'type'  => 'refresh'
-        ];
-        $refreshToken = JWT::encode($refreshPayload, $privateKey, 'RS256');
-
+    if (!$user) {
         return response()->json([
-            'success' => true,
-            'message' => 'Inicio de sesión exitoso',
-            'user' => [
-                'id'    => $user->id,
-                'name'  => trim($user->first_name . ' ' . $user->last_name),
-                'email' => $user->email,
-                'roles' => $user->roles->map(fn($r) => [
-                    'id'   => $r->id,
-                    'name' => $r->name
-                ])->values()
-            ],
-            'token'  => $accessToken,
-            'refresh_token' => $refreshToken
-        ]);
+            'success' => false,
+            'message' => 'Usuario no encontrado'
+        ], 401);
     }
+
+    // Validar si el usuario está habilitado (tolerante a tipos de datos)
+    if (!$user->enabled || $user->enabled === false || $user->enabled === 0 || $user->enabled === 'f') {
+        return response()->json([
+            'success' => false,
+            'message' => 'El usuario está deshabilitado. Comuníquese con el administrador.'
+        ], 403);
+    }
+
+    // Validar contraseña (SHA512)
+    $hashedInput = hash('sha512', $request->password);
+    if (!hash_equals($hashedInput, $user->password)) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Contraseña incorrecta'
+        ], 401);
+    }
+
+    // Cargar clave privada
+    $privateKey = file_get_contents(env('JWT_PRIVATE_KEY_PATH'));
+
+    // Generar Access Token
+    $accessPayload = [
+        'sub'   => $user->id,
+        'email' => $user->email,
+        'iat'   => time(),
+        'exp'   => time() + env('JWT_EXPIRE_TIME', 3600),
+        'type'  => 'access'
+    ];
+    $accessToken = JWT::encode($accessPayload, $privateKey, 'RS256');
+
+    // Generar Refresh Token
+    $refreshPayload = [
+        'sub'   => $user->id,
+        'email' => $user->email,
+        'iat'   => time(),
+        'exp'   => time() + env('JWT_REFRESH_EXPIRE_TIME', 604800),
+        'type'  => 'refresh'
+    ];
+    $refreshToken = JWT::encode($refreshPayload, $privateKey, 'RS256');
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Inicio de sesión exitoso',
+        'user' => [
+            'id'    => $user->id,
+            'name'  => trim($user->first_name . ' ' . $user->last_name),
+            'email' => $user->email,
+            'roles' => $user->roles->map(fn($r) => [
+                'id'   => $r->id,
+                'name' => $r->name
+            ])->values()
+        ],
+        'token'  => $accessToken,
+        'refresh_token' => $refreshToken
+    ]);
+}
+
 
     /**
      * Refrescar token

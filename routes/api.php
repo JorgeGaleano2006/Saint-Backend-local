@@ -17,6 +17,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\InconsistenciasController;
 use App\Http\Controllers\DashboardIncController;
+use App\Models\User;
 
 /*
 |--------------------------------------------------------------------------
@@ -60,6 +61,8 @@ Route::get('/clientes/{word}', [ClienteController::class, 'obtenerClientes']);
 // Rutas de usuarios 
 /** 🟢 Obtener usuarios por roles */
 Route::post('/users/by-roles', [UserController::class, 'obtenerPorRoles']);
+Route::post('/users/disable', [UserController::class, 'disableUser']);
+
 
 /* ========================================================================================
 |  Rutas para Órdenes de Producción (OP), Pedidos de Venta (PV) y Producto Terminado (PT)

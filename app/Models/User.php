@@ -73,4 +73,12 @@ class User extends Model
             return $usuario;
         });
     }
+
+
+   public static function disableUser($userId)
+{
+    return self::where('id', $userId)
+        ->update(['enabled' => false]);
+}
+
 }

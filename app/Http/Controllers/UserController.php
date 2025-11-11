@@ -28,4 +28,29 @@ class UserController extends Controller
             ], 500);
         }
     }
+
+   public function disableUser(Request $request)
+{
+    $validated = $request->validate([
+        'user_id' => 'required|integer',
+    ]);
+
+    $userId = $validated['user_id'];
+
+    // llamado al modelo
+    $disabled = User::disableUser($userId);
+
+    if ($disabled) {
+        return response()->json([
+            'success' => true,
+            'message' => 'Usuario deshabilitado correctamente.'
+        ]);
+    } else {
+        return response()->json([
+            'success' => false,
+            'message' => 'No se pudo deshabilitar el usuario o no existe.'
+        ], 404);
+    }
+}
+
 }
